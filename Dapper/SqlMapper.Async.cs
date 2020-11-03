@@ -442,6 +442,7 @@ namespace Dapper
                         }
                         while (await reader.NextResultAsync(cancel).ConfigureAwait(false)) { /* ignore subsequent result sets */ }
                         command.OnCompleted();
+                        _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, "Query", isAsync: true);
                         return buffer;
                     }
                     else
@@ -450,6 +451,7 @@ namespace Dapper
                         wasClosed = false; // don't close if handing back an open reader; rely on the command-behavior
                         var deferred = ExecuteReaderSync<T>(reader, func, command.Parameters);
                         reader = null; // to prevent it being disposed before the caller gets to see it
+                        _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, "Query", isAsync: true);
                         return deferred;
                     }
                 }
@@ -460,7 +462,6 @@ namespace Dapper
                 }
                 finally
                 {
-                    _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, "Query", isAsync: true);
                     using (reader) { /* dispose if non-null */ }
                     if (wasClosed) cnn.Close();
                 }
@@ -498,6 +499,7 @@ namespace Dapper
                         ThrowZeroRows(row);
                     }
                     while (await reader.NextResultAsync(cancel).ConfigureAwait(false)) { /* ignore result sets after the first */ }
+                    _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, "Query", isAsync: true);
                     return result;
                 }
                 catch (Exception ex)
@@ -507,7 +509,6 @@ namespace Dapper
                 }
                 finally
                 {
-                    _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, "Query", isAsync: true);
                     using (reader) { /* dispose if non-null */ }
                     if (wasClosed) cnn.Close();
                 }
@@ -647,6 +648,7 @@ namespace Dapper
                 }
 
                 command.OnCompleted();
+                _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, isAsync: true);
             }
             catch (Exception ex)
             {
@@ -655,7 +657,6 @@ namespace Dapper
             }
             finally
             {
-                _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, isAsync: true);
                 if (wasClosed) cnn.Close();
             }
             return total;
@@ -674,6 +675,7 @@ namespace Dapper
                     if (wasClosed) await cnn.TryOpenAsync(command.CancellationToken).ConfigureAwait(false);
                     var result = await cmd.ExecuteNonQueryAsync(command.CancellationToken).ConfigureAwait(false);
                     command.OnCompleted();
+                    _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, isAsync: true);
                     return result;
                 }
                 catch (Exception ex)
@@ -683,7 +685,6 @@ namespace Dapper
                 }
                 finally
                 {
-                    _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, isAsync: true);
                     if (wasClosed) cnn.Close();
                 }
             }
@@ -1250,6 +1251,7 @@ namespace Dapper
                 if (wasClosed) await cnn.TryOpenAsync(command.CancellationToken).ConfigureAwait(false);
                 result = await cmd.ExecuteScalarAsync(command.CancellationToken).ConfigureAwait(false);
                 command.OnCompleted();
+                _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, isAsync: true);
             }
             catch (Exception ex)
             {
@@ -1258,7 +1260,6 @@ namespace Dapper
             }
             finally
             {
-                _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, isAsync: true);
                 if (wasClosed) cnn.Close();
                 cmd?.Dispose();
             }

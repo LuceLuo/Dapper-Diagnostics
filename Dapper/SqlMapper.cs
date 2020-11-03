@@ -557,6 +557,7 @@ namespace Dapper
                         }
                     }
                     command.OnCompleted();
+                    _diagnosticListener.WriteExecuteAfter(operationId, cnn, command);
                 }
                 catch (Exception ex)
                 {
@@ -565,7 +566,6 @@ namespace Dapper
                 }
                 finally
                 {
-                    _diagnosticListener.WriteExecuteAfter(operationId, cnn, command);
                     if (wasClosed) cnn.Close();
                 }
                 return total;
@@ -1209,6 +1209,7 @@ namespace Dapper
                 reader = null;
 
                 command.OnCompleted();
+                _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, "Query");
                 return result;
             }
             catch (Exception ex)
@@ -1218,7 +1219,6 @@ namespace Dapper
             }
             finally
             {
-                _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, "Query");
                 if (reader != null)
                 {
                     if (!reader.IsClosed)
@@ -2875,6 +2875,7 @@ namespace Dapper
                 if (wasClosed) cnn.Open();
                 result = cmd.ExecuteScalar();
                 command.OnCompleted();
+                _diagnosticListener.WriteExecuteAfter(operationId, cnn, command);
             }
             catch (Exception ex)
             {
@@ -2883,7 +2884,6 @@ namespace Dapper
             }
             finally
             {
-                _diagnosticListener.WriteExecuteAfter(operationId, cnn, command);
                 if (wasClosed) cnn.Close();
                 cmd?.Dispose();
             }
