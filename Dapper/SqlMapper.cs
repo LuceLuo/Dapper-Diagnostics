@@ -8,6 +8,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
@@ -26,6 +27,9 @@ namespace Dapper
     /// </summary>
     public static partial class SqlMapper
     {
+
+        private static readonly DiagnosticListener _diagnosticListener = DiagnosticListenerExtensions.Instance;
+
         private class PropertyInfoByNameComparer : IComparer<PropertyInfo>
         {
             public int Compare(PropertyInfo x, PropertyInfo y) => string.CompareOrdinal(x.Name, y.Name);
@@ -513,6 +517,7 @@ namespace Dapper
 
         private static int ExecuteImpl(this IDbConnection cnn, ref CommandDefinition command)
         {
+            var operationId = _diagnosticListener.WriteExecuteBefore(cnn, command);
             object param = command.Parameters;
             IEnumerable multiExec = GetMultiExec(param);
             Identity identity;
@@ -553,8 +558,14 @@ namespace Dapper
                     }
                     command.OnCompleted();
                 }
+                catch (Exception ex)
+                {
+                    _diagnosticListener.WriteExecuteError(operationId, cnn, command, ex);
+                    throw ex;
+                }
                 finally
                 {
+                    _diagnosticListener.WriteExecuteAfter(operationId, cnn, command);
                     if (wasClosed) cnn.Close();
                 }
                 return total;
@@ -1064,6 +1075,7 @@ namespace Dapper
 
         private static IEnumerable<T> QueryImpl<T>(this IDbConnection cnn, CommandDefinition command, Type effectiveType)
         {
+            var operationId = _diagnosticListener.WriteExecuteBefore(cnn, command, "Query");
             object param = command.Parameters;
             var identity = new Identity(command.CommandText, command.CommandType, cnn, effectiveType, param?.GetType());
             var info = GetCacheInfo(identity, param, command.AddToCache);
@@ -1120,6 +1132,7 @@ namespace Dapper
                 }
                 if (wasClosed) cnn.Close();
                 cmd?.Dispose();
+                _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, "Query");
             }
         }
 
@@ -1155,6 +1168,7 @@ namespace Dapper
 
         private static T QueryRowImpl<T>(IDbConnection cnn, Row row, ref CommandDefinition command, Type effectiveType)
         {
+            var operationId = _diagnosticListener.WriteExecuteBefore(cnn, command, "Query");
             object param = command.Parameters;
             var identity = new Identity(command.CommandText, command.CommandType, cnn, effectiveType, param?.GetType());
             var info = GetCacheInfo(identity, param, command.AddToCache);
@@ -1197,8 +1211,14 @@ namespace Dapper
                 command.OnCompleted();
                 return result;
             }
+            catch (Exception ex)
+            {
+                _diagnosticListener.WriteExecuteError(operationId, cnn, command, ex, "Query");
+                throw ex;
+            }
             finally
             {
+                _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, "Query");
                 if (reader != null)
                 {
                     if (!reader.IsClosed)
@@ -1428,6 +1448,7 @@ namespace Dapper
 
         private static IEnumerable<TReturn> MultiMapImpl<TFirst, TSecond, TThird, TFourth, TFifth, TSixth, TSeventh, TReturn>(this IDbConnection cnn, CommandDefinition command, Delegate map, string splitOn, IDataReader reader, Identity identity, bool finalize)
         {
+            var operationId = _diagnosticListener.WriteExecuteBefore(cnn, command, "Query");
             object param = command.Parameters;
             identity ??= new Identity<TFirst, TSecond, TThird, TFourth, TFifth, TSixth, TSeventh>(command.CommandText, command.CommandType, cnn, typeof(TFirst), param?.GetType());
             CacheInfo cinfo = GetCacheInfo(identity, param, command.AddToCache);
@@ -1474,6 +1495,7 @@ namespace Dapper
             }
             finally
             {
+                _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, "Query");
                 try
                 {
                     ownedReader?.Dispose();
@@ -1493,6 +1515,7 @@ namespace Dapper
 
         private static IEnumerable<TReturn> MultiMapImpl<TReturn>(this IDbConnection cnn, CommandDefinition command, Type[] types, Func<object[], TReturn> map, string splitOn, IDataReader reader, Identity identity, bool finalize)
         {
+            var operationId = _diagnosticListener.WriteExecuteBefore(cnn, command, "Query");
             if (types.Length < 1)
             {
                 throw new ArgumentException("you must provide at least one type to deserialize");
@@ -1544,6 +1567,7 @@ namespace Dapper
             }
             finally
             {
+                _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, "Query");
                 try
                 {
                     ownedReader?.Dispose();
@@ -2833,6 +2857,7 @@ namespace Dapper
 
         private static T ExecuteScalarImpl<T>(IDbConnection cnn, ref CommandDefinition command)
         {
+            var operationId = _diagnosticListener.WriteExecuteBefore(cnn, command);
             Action<IDbCommand, object> paramReader = null;
             object param = command.Parameters;
             if (param != null)
@@ -2851,8 +2876,14 @@ namespace Dapper
                 result = cmd.ExecuteScalar();
                 command.OnCompleted();
             }
+            catch (Exception ex)
+            {
+                _diagnosticListener.WriteExecuteError(operationId, cnn, command, ex);
+                throw ex;
+            }
             finally
             {
+                _diagnosticListener.WriteExecuteAfter(operationId, cnn, command);
                 if (wasClosed) cnn.Close();
                 cmd?.Dispose();
             }

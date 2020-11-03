@@ -405,6 +405,7 @@ namespace Dapper
 
         private static async Task<IEnumerable<T>> QueryAsync<T>(this IDbConnection cnn, Type effectiveType, CommandDefinition command)
         {
+            var operationId = _diagnosticListener.WriteExecuteBefore(cnn, command, "Query", isAsync: true);
             object param = command.Parameters;
             var identity = new Identity(command.CommandText, command.CommandType, cnn, effectiveType, param?.GetType());
             var info = GetCacheInfo(identity, param, command.AddToCache);
@@ -452,8 +453,14 @@ namespace Dapper
                         return deferred;
                     }
                 }
+                catch (Exception ex)
+                {
+                    _diagnosticListener.WriteExecuteError(operationId, cnn, command, ex, "Query", isAsync: true);
+                    throw ex;
+                }
                 finally
                 {
+                    _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, "Query", isAsync: true);
                     using (reader) { /* dispose if non-null */ }
                     if (wasClosed) cnn.Close();
                 }
@@ -462,6 +469,7 @@ namespace Dapper
 
         private static async Task<T> QueryRowAsync<T>(this IDbConnection cnn, Row row, Type effectiveType, CommandDefinition command)
         {
+            var operationId = _diagnosticListener.WriteExecuteBefore(cnn, command, "Query", isAsync: true);
             object param = command.Parameters;
             var identity = new Identity(command.CommandText, command.CommandType, cnn, effectiveType, param?.GetType());
             var info = GetCacheInfo(identity, param, command.AddToCache);
@@ -492,8 +500,14 @@ namespace Dapper
                     while (await reader.NextResultAsync(cancel).ConfigureAwait(false)) { /* ignore result sets after the first */ }
                     return result;
                 }
+                catch (Exception ex)
+                {
+                    _diagnosticListener.WriteExecuteError(operationId, cnn, command, ex, "Query", isAsync: true);
+                    throw ex;
+                }
                 finally
                 {
+                    _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, "Query", isAsync: true);
                     using (reader) { /* dispose if non-null */ }
                     if (wasClosed) cnn.Close();
                 }
@@ -546,6 +560,7 @@ namespace Dapper
 
         private static async Task<int> ExecuteMultiImplAsync(IDbConnection cnn, CommandDefinition command, IEnumerable multiExec)
         {
+            var operationId = _diagnosticListener.WriteExecuteBefore(cnn, command, isAsync: true);
             bool isFirst = true;
             int total = 0;
             bool wasClosed = cnn.State == ConnectionState.Closed;
@@ -633,8 +648,14 @@ namespace Dapper
 
                 command.OnCompleted();
             }
+            catch (Exception ex)
+            {
+                _diagnosticListener.WriteExecuteError(operationId, cnn, command, ex, isAsync: true);
+                throw ex;
+            }
             finally
             {
+                _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, isAsync: true);
                 if (wasClosed) cnn.Close();
             }
             return total;
@@ -642,6 +663,7 @@ namespace Dapper
 
         private static async Task<int> ExecuteImplAsync(IDbConnection cnn, CommandDefinition command, object param)
         {
+            var operationId = _diagnosticListener.WriteExecuteBefore(cnn, command, isAsync: true);
             var identity = new Identity(command.CommandText, command.CommandType, cnn, null, param?.GetType());
             var info = GetCacheInfo(identity, param, command.AddToCache);
             bool wasClosed = cnn.State == ConnectionState.Closed;
@@ -654,8 +676,14 @@ namespace Dapper
                     command.OnCompleted();
                     return result;
                 }
+                catch (Exception ex)
+                {
+                    _diagnosticListener.WriteExecuteError(operationId, cnn, command, ex, isAsync: true);
+                    throw ex;
+                }
                 finally
                 {
+                    _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, isAsync: true);
                     if (wasClosed) cnn.Close();
                 }
             }
@@ -1204,6 +1232,7 @@ namespace Dapper
 
         private static async Task<T> ExecuteScalarImplAsync<T>(IDbConnection cnn, CommandDefinition command)
         {
+            var operationId = _diagnosticListener.WriteExecuteBefore(cnn, command, isAsync: true);
             Action<IDbCommand, object> paramReader = null;
             object param = command.Parameters;
             if (param != null)
@@ -1222,8 +1251,14 @@ namespace Dapper
                 result = await cmd.ExecuteScalarAsync(command.CancellationToken).ConfigureAwait(false);
                 command.OnCompleted();
             }
+            catch (Exception ex)
+            {
+                _diagnosticListener.WriteExecuteError(operationId, cnn, command, ex, isAsync: true);
+                throw ex;
+            }
             finally
             {
+                _diagnosticListener.WriteExecuteAfter(operationId, cnn, command, isAsync: true);
                 if (wasClosed) cnn.Close();
                 cmd?.Dispose();
             }
